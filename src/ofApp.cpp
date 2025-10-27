@@ -54,6 +54,12 @@ void ofApp::setup(){
     ));
 
     ofSetLogLevel(OF_LOG_NOTICE); // Set default log level
+
+    // Background music, we chose "The Turtle Lope" from Finding Nemo because it seemed fitting lol.
+    backgroundmusic.load("The Turtle Lope.mp3");
+    backgroundmusic.setLoop(true);
+    backgroundmusic.setVolume(0.6f);
+    backgroundmusic.play();
 }
 
 //--------------------------------------------------------------
