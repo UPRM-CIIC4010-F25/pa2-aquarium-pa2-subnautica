@@ -1,5 +1,6 @@
 #include "Aquarium.h"
 #include <cstdlib>
+#include <cmath>
 
 
 string AquariumCreatureTypeToString(AquariumCreatureType t){
@@ -8,8 +9,12 @@ string AquariumCreatureTypeToString(AquariumCreatureType t){
             return "BiggerFish";
         case AquariumCreatureType::NPCreature:
             return "BaseFish";
+            case AquariumCreatureType::JellyFish:
+            return "JellyFish";
+        case AquariumCreatureType::SkeletonFish:
+            return "SkeletonFish";
         default:
-            return "UknownFish";
+            return "UnknownFish"; //spell fix
     }
 }
 
@@ -131,11 +136,62 @@ void BiggerFish::draw() const {
     this->m_sprite->draw(this->m_x, this->m_y);
 }
 
+JellyFish::JellyFish(float x, float y, int speed, std::shared_ptr<GameSprite> sprite)
+: NPCreature(x, y, speed, sprite) {
+    m_dx = 0;
+    m_dy = (rand() % 3 - 1);
+    normalize();
+
+    setCollisionRadius(25.0f); // Jellyfish have a smaller collision radius
+    m_value = 2;
+    m_creatureType = AquariumCreatureType::JellyFish;
+}
+
+void JellyFish::move() {
+    static float time = 0.0f;
+    time += 0.1f;
+    m_x += m_dx * (m_speed * 0.2f); // Slow drift
+    m_y += std::sin(time) * 2.0f;   // vertical movement
+    if (m_dx < 0) this->m_sprite->setFlipped(true);
+    else this->m_sprite->setFlipped(false);
+    bounce();
+}
+
+void JellyFish::draw() const {
+    ofLogVerbose() << "JellyFish at (" << m_x << ", " << m_y << ") with speed " << m_speed << std::endl;
+    if (m_sprite) m_sprite->draw(m_x, m_y);
+}
+
+SkeletonFish::SkeletonFish(float x, float y, int speed, std::shared_ptr<GameSprite> sprite)
+: NPCreature(x, y, speed, sprite) {
+    m_dx = 1; // Always moves right by default
+    m_dy = 0;
+    normalize();
+
+    setCollisionRadius(40.0f);
+    m_value = 3;
+    m_creatureType = AquariumCreatureType::SkeletonFish;
+}
+
+void SkeletonFish::move() {
+    m_x += m_dx * m_speed;
+    if (m_dx < 0) this->m_sprite->setFlipped(true);
+    else this->m_sprite->setFlipped(false);
+    bounce();
+}
+
+void SkeletonFish::draw() const {
+    ofLogVerbose() << "SkeletonFish at (" << m_x << ", " << m_y << ") with speed " << m_speed << std::endl;
+    if (m_sprite) m_sprite->draw(m_x, m_y);
+}
+
 
 // AquariumSpriteManager
 AquariumSpriteManager::AquariumSpriteManager(){
     this->m_npc_fish = std::make_shared<GameSprite>("base-fish.png", 70,70);
     this->m_big_fish = std::make_shared<GameSprite>("bigger-fish.png", 120, 120);
+    this->m_jelly_fish = std::make_shared<GameSprite>("Jellyfish.png", 50, 50);
+    this->m_skeleton_fish = std::make_shared<GameSprite>("Robo Fish.png", 100, 100);
 }
 
 std::shared_ptr<GameSprite> AquariumSpriteManager::GetSprite(AquariumCreatureType t){
@@ -145,6 +201,10 @@ std::shared_ptr<GameSprite> AquariumSpriteManager::GetSprite(AquariumCreatureTyp
             
         case AquariumCreatureType::NPCreature:
             return std::make_shared<GameSprite>(*this->m_npc_fish);
+            case AquariumCreatureType::JellyFish:
+            return std::make_shared<GameSprite>(*this->m_jelly_fish);
+        case AquariumCreatureType::SkeletonFish:
+            return std::make_shared<GameSprite>(*this->m_skeleton_fish);
         default:
             return nullptr;
     }
@@ -208,9 +268,9 @@ std::shared_ptr<Creature> Aquarium::getCreatureAt(int index) {
 
 
 void Aquarium::SpawnCreature(AquariumCreatureType type) {
-    int x = rand() % this->getWidth();
+     int x = rand() % this->getWidth();
     int y = rand() % this->getHeight();
-    int speed = 1 + rand() % 25; // Speed between 1 and 25
+    int speed = 1 + rand() % 6;
 
     switch (type) {
         case AquariumCreatureType::NPCreature:
@@ -219,12 +279,21 @@ void Aquarium::SpawnCreature(AquariumCreatureType type) {
         case AquariumCreatureType::BiggerFish:
             this->addCreature(std::make_shared<BiggerFish>(x, y, speed, this->m_sprite_manager->GetSprite(AquariumCreatureType::BiggerFish)));
             break;
+        case AquariumCreatureType::JellyFish:
+            this->addCreature(std::make_shared<JellyFish>(x, y, std::max(1, speed/3), this->m_sprite_manager->GetSprite(AquariumCreatureType::JellyFish)));
+            break;
+        case AquariumCreatureType::SkeletonFish: {
+            // spawn at left edge by constructing with x=0 (no setX needed)
+            auto sk = std::make_shared<SkeletonFish>(0, y, std::max(2, speed), this->m_sprite_manager->GetSprite(AquariumCreatureType::SkeletonFish));
+            this->addCreature(sk);
+            break;
+        }
         default:
             ofLogError() << "Unknown creature type to spawn!";
             break;
     }
+    }
 
-}
 
 
 // repopulation will be called from the levl class
@@ -285,33 +354,55 @@ void AquariumGameScene::Update(){
             ofLogVerbose() << "Collision detected between player and NPC!" << std::endl;
             if(event->creatureB != nullptr){
                 event->print();
-                if(this->m_player->getPower() < event->creatureB->getValue()){
-                    ofLogNotice() << "Player is too weak to eat the creature!" << std::endl;
-                    this->m_player->loseLife(3*60); // 3 frames debounce, 3 seconds at 60fps
-                    if(this->m_player->getLives() <= 0){
-                        this->m_lastEvent = std::make_shared<GameEvent>(GameEventType::GAME_OVER, this->m_player, nullptr);
-                        return;
-                    }
-                }
-                else{
+
+               if (std::dynamic_pointer_cast<SkeletonFish>(event->creatureB)) {
+                    //Skeleton fish gimmick
+                    ofLogNotice() << "Hit by SkeletonFish — player loses a life regardless of power.";
+                    this->m_player->loseLife(3*60); 
+                    this->m_aquarium->removeCreature(event->creatureB);
+                    
+                } 
+                //BASE FISH LOGIC, Always edible for initial points
+                else if (std::dynamic_pointer_cast<NPCreature>(event->creatureB)) {
+                    ofLogNotice() << "Player is eating BaseFish regardless of power for initial points." << std::endl;
                     this->m_aquarium->removeCreature(event->creatureB);
                     this->m_player->addToScore(1, event->creatureB->getValue());
+                    
+                    // Power increase check
                     if (this->m_player->getScore() % 25 == 0){
                         this->m_player->increasePower(1);
                         ofLogNotice() << "Player power increased to " << this->m_player->getPower() << "!" << std::endl;
                     }
+                }
+                //LOGIC FOR ALL NPCs
+                else if(this->m_player->getPower() >= event->creatureB->getValue()){
+                    // Player is strong enough = EAT
+                    this->m_aquarium->removeCreature(event->creatureB);
+                    this->m_player->addToScore(1, event->creatureB->getValue());
                     
+                    // Power increase check
+                    if (this->m_player->getScore() % 25 == 0){
+                        this->m_player->increasePower(1);
+                        ofLogNotice() << "Player power increased to " << this->m_player->getPower() << "!" << std::endl;
+                    }
+                } else {
+                    // Player is too weak: Ignore collision.
+                    ofLogNotice() << "Player is too weak to eat the creature! Collision ignored." << std::endl;
                 }
                 
+                // --- Game Over Check
+                if(this->m_player->getLives() <= 0){
+                    this->m_lastEvent = std::make_shared<GameEvent>(GameEventType::GAME_OVER, this->m_player, nullptr);
+                    return;
+                }
                 
-
             } else {
                 ofLogError() << "Error: creatureB is null in collision event." << std::endl;
             }
         }
+    
         this->m_aquarium->update();
     }
-
 }
 
 void AquariumGameScene::Draw() {

@@ -100,9 +100,10 @@ public:
     void setBounds(int w, int h);
     void normalize();
     void bounce();
+    void setX(float x) { m_x = x; }
+    void setY(float y) { m_y = y; }
+    void setPosition(float x, float y) { m_x = x; m_y = y; }
 };
-
-// GameEvents
 enum class GameEventType {
     NONE,
     COLLISION,
