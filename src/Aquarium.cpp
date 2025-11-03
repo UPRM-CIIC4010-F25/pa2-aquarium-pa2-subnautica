@@ -20,7 +20,9 @@ string AquariumCreatureTypeToString(AquariumCreatureType t){
 
 // PlayerCreature Implementation
 PlayerCreature::PlayerCreature(float x, float y, int speed, std::shared_ptr<GameSprite> sprite)
-: Creature(x, y, speed, 10.0f, 1, sprite) {}
+: Creature(x, y, speed, 10.0f, 1, sprite) {
+    this->m_original_speed = speed;
+}
 
 
 void PlayerCreature::setDirection(float dx, float dy) {
@@ -43,6 +45,8 @@ void PlayerCreature::reduceDamageDebounce() {
 
 void PlayerCreature::update() {
     this->reduceDamageDebounce();
+    this->applyTemporarySpeed();
+    this->reduceInvincibilityTimer();
     this->move();
 }
 
@@ -57,7 +61,13 @@ void PlayerCreature::draw() const {
         m_sprite->draw(m_x, m_y);
     }
     ofSetColor(ofColor::white); // Reset color
-
+ 
+    if (this->m_damage_debounce > 0 || this->m_invincibility_timer > 0) { // Check for invincibility too
+        ofSetColor(ofColor::yellow, 150); // Flash yellow transparent for invincibility
+    } else {
+        ofSetColor(ofColor::white); // Default
+    }
+ofSetColor(ofColor::white); // Reset color
 }
 
 void PlayerCreature::changeSpeed(int speed) {
@@ -65,6 +75,9 @@ void PlayerCreature::changeSpeed(int speed) {
 }
 
 void PlayerCreature::loseLife(int debounce) {
+    if (m_invincibility_timer > 0) {
+ ofLogNotice() << "Player is invincible! Life loss prevented." << std::endl;
+return;}
     if (m_damage_debounce <= 0) {
         if (m_lives > 0) this->m_lives -= 1;
         m_damage_debounce = debounce; // Set debounce frames
@@ -74,6 +87,17 @@ void PlayerCreature::loseLife(int debounce) {
     if (m_damage_debounce > 0) {
         ofLogVerbose() << "Player is in damage debounce period. Frames left: " << m_damage_debounce << std::endl;
     }
+}
+void PlayerCreature::grantInvincibility(int durationFrames) {
+ m_invincibility_timer = durationFrames;
+ ofLogNotice() << "Player is INVINCIBLE for " << durationFrames << " frames!" << std::endl;
+}
+
+void PlayerCreature::reduceInvincibilityTimer() {
+ if (m_invincibility_timer > 0) {
+--m_invincibility_timer;
+ofLogVerbose() << "Invincibility active. Frames left: " << m_invincibility_timer << std::endl;
+}
 }
 
 // NPCreature Implementation
@@ -185,6 +209,89 @@ void SkeletonFish::draw() const {
     if (m_sprite) m_sprite->draw(m_x, m_y);
 }
 
+SpeedPowerUp::SpeedPowerUp(float x, float y, std::shared_ptr<GameSprite> sprite)
+    : Creature(x, y, 1, 20.0f, 0, sprite) {
+    m_dx = (rand() % 3 - 1);
+    m_dy = (rand() % 3 - 1);
+    normalize();
+}
+
+void SpeedPowerUp::move() {
+    m_x += m_dx * m_speed * 0.5f; 
+    m_y += m_dy * m_speed * 0.5f;
+    this->bounce();
+}
+
+void SpeedPowerUp::draw() const {
+    ofLogVerbose() << "SpeedPowerUp at (" << m_x << ", " << m_y << ")" << std::endl;
+    if (m_sprite) {
+        m_sprite->draw(m_x, m_y);
+    }
+}
+
+void PlayerCreature::applyTemporarySpeed() {
+    if (m_speed_boost_timer > 0) {
+        --m_speed_boost_timer;
+        ofLogVerbose() << "Speed boost active. Frames left: " << m_speed_boost_timer << std::endl;
+    } else if (m_speed_boost_timer == 0 && m_speed != m_original_speed) {
+        m_speed = m_original_speed;
+        ofLogNotice() << "Speed boost expired. Speed reset to " << m_original_speed << "!" << std::endl;
+    }
+}
+
+ExtraLifePowerUp::ExtraLifePowerUp(float x, float y, std::shared_ptr<GameSprite> sprite)
+: Creature(x, y, 1, 20.0f, 0, sprite) {
+m_dx = (rand() % 3 - 1);
+m_dy = (rand() % 3 - 1);
+normalize();
+}
+
+void ExtraLifePowerUp::move() {
+ m_x += m_dx * m_speed * 0.5f; 
+m_y += m_dy * m_speed * 0.5f;
+this->bounce();
+}
+
+void ExtraLifePowerUp::draw() const {
+ ofLogVerbose() << "ExtraLifePowerUp at (" << m_x << ", " << m_y << ")" << std::endl;
+ if (m_sprite) {
+ m_sprite->draw(m_x, m_y);
+}
+}
+
+
+// InvincibilityPowerUp Implementation
+InvincibilityPowerUp::InvincibilityPowerUp(float x, float y, std::shared_ptr<GameSprite> sprite)
+: Creature(x, y, 1, 20.0f, 0, sprite) {
+ m_dx = (rand() % 3 - 1);
+ m_dy = (rand() % 3 - 1);
+ normalize();
+}
+
+void InvincibilityPowerUp::move() {
+ m_x += m_dx * m_speed * 0.5f; 
+ m_y += m_dy * m_speed * 0.5f;
+this->bounce();
+}
+
+void InvincibilityPowerUp::draw() const {
+ofLogVerbose() << "InvincibilityPowerUp at (" << m_x << ", " << m_y << ")" << std::endl;
+ if (m_sprite) {
+m_sprite->draw(m_x, m_y);
+}
+}
+
+// In Aquarium.cpp
+
+void PlayerCreature::increaseSpeed(int value, int durationFrames) {
+    if (m_speed_boost_timer <= 0) {
+        m_original_speed = m_speed; 
+    }
+    m_speed += value; 
+    m_speed_boost_timer += durationFrames;
+    
+    ofLogNotice() << "Player speed increased by " << value << " to " << m_speed << "! Duration: " << durationFrames << " frames." << std::endl;
+}
 
 // AquariumSpriteManager
 AquariumSpriteManager::AquariumSpriteManager(){
@@ -192,6 +299,9 @@ AquariumSpriteManager::AquariumSpriteManager(){
     this->m_big_fish = std::make_shared<GameSprite>("bigger-fish.png", 120, 120);
     this->m_jelly_fish = std::make_shared<GameSprite>("Jellyfish.png", 50, 50);
     this->m_skeleton_fish = std::make_shared<GameSprite>("Robo Fish.png", 100, 100);
+    this->m_speed_powerup_sprite = std::make_shared<GameSprite>("speedboost.png", 50, 50);
+    this->m_extra_life_powerup_sprite = std::make_shared<GameSprite>("extra life.png", 60, 60);
+    this->m_invincibility_powerup_sprite = std::make_shared<GameSprite>("Invincibility.png", 80, 80);
 }
 
 std::shared_ptr<GameSprite> AquariumSpriteManager::GetSprite(AquariumCreatureType t){
@@ -205,6 +315,12 @@ std::shared_ptr<GameSprite> AquariumSpriteManager::GetSprite(AquariumCreatureTyp
             return std::make_shared<GameSprite>(*this->m_jelly_fish);
         case AquariumCreatureType::SkeletonFish:
             return std::make_shared<GameSprite>(*this->m_skeleton_fish);
+        case AquariumCreatureType::SpeedPowerup: 
+            return std::make_shared<GameSprite>(*this->m_speed_powerup_sprite);
+            case AquariumCreatureType::ExtraLifePowerup: 
+        return std::make_shared<GameSprite>(*this->m_extra_life_powerup_sprite);
+        case AquariumCreatureType::InvincibilityPowerup: 
+        return std::make_shared<GameSprite>(*this->m_invincibility_powerup_sprite);
         default:
             return nullptr;
     }
@@ -247,9 +363,13 @@ void Aquarium::removeCreature(std::shared_ptr<Creature> creature) {
     auto it = std::find(m_creatures.begin(), m_creatures.end(), creature);
     if (it != m_creatures.end()) {
         ofLogVerbose() << "removing creature " << endl;
+        auto npcCreature = std::dynamic_pointer_cast<NPCreature>(creature);
+        if (npcCreature) {
         int selectLvl = this->currentLevel % this->m_aquariumlevels.size();
-        auto npcCreature = std::static_pointer_cast<NPCreature>(creature);
         this->m_aquariumlevels.at(selectLvl)->ConsumePopulation(npcCreature->GetType(), npcCreature->getValue());
+        }else {
+            ofLogVerbose() << "Not an NPCreature " << endl;
+        }
         m_creatures.erase(it);
     }
 }
@@ -288,6 +408,18 @@ void Aquarium::SpawnCreature(AquariumCreatureType type) {
             this->addCreature(sk);
             break;
         }
+        case AquariumCreatureType::SpeedPowerup: { 
+             this->addCreature(std::make_shared<SpeedPowerUp>(x, y, this->m_sprite_manager->GetSprite(AquariumCreatureType::SpeedPowerup)));
+             break;
+        }
+        case AquariumCreatureType::ExtraLifePowerup: { 
+        this->addCreature(std::make_shared<ExtraLifePowerUp>(x, y, this->m_sprite_manager->GetSprite(AquariumCreatureType::ExtraLifePowerup)));
+        break;
+ }
+        case AquariumCreatureType::InvincibilityPowerup: { 
+        this->addCreature(std::make_shared<InvincibilityPowerUp>(x, y, this->m_sprite_manager->GetSprite(AquariumCreatureType::InvincibilityPowerup)));
+        break;
+}
         default:
             ofLogError() << "Unknown creature type to spawn!";
             break;
@@ -355,6 +487,26 @@ void AquariumGameScene::Update(){
             if(event->creatureB != nullptr){
                 event->print();
 
+                if (std::dynamic_pointer_cast<SpeedPowerUp>(event->creatureB)) { 
+                    ofLogNotice() << "Player collected a Speed PowerUp!";
+                    
+                    auto powerUp = std::static_pointer_cast<SpeedPowerUp>(event->creatureB);
+                    const int BOOST_DURATION_FRAMES = 300;
+                    this->m_player->increaseSpeed(powerUp->getSpeedBoostAmount(), BOOST_DURATION_FRAMES); 
+                    this->m_aquarium->removeCreature(event->creatureB);
+                }
+                else if (std::dynamic_pointer_cast<ExtraLifePowerUp>(event->creatureB)) { 
+    ofLogNotice() << "Player collected an Extra Life PowerUp!";
+    this->m_player->setLives(this->m_player->getLives() + 1);
+    this->m_aquarium->removeCreature(event->creatureB);
+} 
+else if (std::dynamic_pointer_cast<InvincibilityPowerUp>(event->creatureB)) { 
+    ofLogNotice() << "Player collected an Invincibility PowerUp!";
+    auto powerUp = std::static_pointer_cast<InvincibilityPowerUp>(event->creatureB);
+    const int INVINCIBILITY_DURATION_FRAMES = 300;
+    this->m_player->grantInvincibility(INVINCIBILITY_DURATION_FRAMES);
+    this->m_aquarium->removeCreature(event->creatureB);
+}
                if (std::dynamic_pointer_cast<SkeletonFish>(event->creatureB)) {
                     //Skeleton fish gimmick
                     ofLogNotice() << "Hit by SkeletonFish — player loses a life regardless of power.";
@@ -362,6 +514,7 @@ void AquariumGameScene::Update(){
                     this->m_aquarium->removeCreature(event->creatureB);
                     
                 } 
+                 
                 //BASE FISH LOGIC, Always edible for initial points
                 else if (std::dynamic_pointer_cast<NPCreature>(event->creatureB)) {
                     ofLogNotice() << "Player is eating BaseFish regardless of power for initial points." << std::endl;
@@ -485,7 +638,20 @@ std::vector<AquariumCreatureType> Level_1::Repopulate() {
 }
 
 std::vector<AquariumCreatureType> Level_2::Repopulate() {
-    std::vector<AquariumCreatureType> toRepopulate;
+std::vector<AquariumCreatureType> toRepopulate;
+for(std::shared_ptr<AquariumLevelPopulationNode> node : this->m_levelPopulation){
+ int delta = node->population - node->currentPopulation;
+    if(delta >0){
+for(int i=0; i<delta; i++){
+    toRepopulate.push_back(node->creatureType);
+}
+ node->currentPopulation += delta;
+}
+}
+    return toRepopulate;
+}
+std::vector<AquariumCreatureType> Level_3::Repopulate() { 
+std::vector<AquariumCreatureType> toRepopulate;
     for(std::shared_ptr<AquariumLevelPopulationNode> node : this->m_levelPopulation){
         int delta = node->population - node->currentPopulation;
         if(delta >0){
@@ -497,3 +663,4 @@ std::vector<AquariumCreatureType> Level_2::Repopulate() {
     }
     return toRepopulate;
 }
+

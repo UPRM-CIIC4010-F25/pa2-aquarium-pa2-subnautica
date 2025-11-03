@@ -11,7 +11,10 @@ enum class AquariumCreatureType {
     NPCreature,
     BiggerFish, 
     JellyFish,
-    SkeletonFish
+    SkeletonFish,
+    SpeedPowerup,
+    ExtraLifePowerup,
+    InvincibilityPowerup
 };
 
 string AquariumCreatureTypeToString(AquariumCreatureType t);
@@ -69,12 +72,53 @@ public:
     void loseLife(int debounce);
     void increasePower(int value) { m_power += value; }
     void reduceDamageDebounce();
-    
+    void increaseSpeed(int value, int durationFrames);
+    void applyTemporarySpeed();
+    void reduceInvincibilityTimer();
+    void grantInvincibility(int durationFrames);
+
 private:
     int m_score = 0;
     int m_lives = 3;
     int m_power = 1; // mark current power lvl
     int m_damage_debounce = 0; // frames to wait after eating
+    int m_original_speed = 0;
+    int m_speed_boost_timer = 0;
+    int m_invincibility_timer = 0;
+};
+
+class SpeedPowerUp : public Creature {
+public:
+    SpeedPowerUp(float x, float y, std::shared_ptr<GameSprite> sprite);
+    void move() override;
+    void draw() const override;
+    int getSpeedBoostAmount() const { return m_speedBoostAmount; }
+
+private:
+    int m_speedBoostAmount = 5; 
+   
+};
+
+class ExtraLifePowerUp : public Creature {
+public:
+    ExtraLifePowerUp(float x, float y, std::shared_ptr<GameSprite> sprite);
+    void move() override;
+    void draw() const override;
+    int getLivesGained() const { return m_livesGained; }
+
+private:
+    int m_livesGained = 1;
+};
+
+class InvincibilityPowerUp : public Creature {
+public:
+    InvincibilityPowerUp(float x, float y, std::shared_ptr<GameSprite> sprite);
+    void move() override;
+    void draw() const override;
+    int getInvincibilityDurationFrames() const { return m_durationFrames; }
+
+private:
+    int m_durationFrames = 5 * 60; 
 };
 
 class NPCreature : public Creature {
@@ -83,9 +127,14 @@ public:
     AquariumCreatureType GetType() {return this->m_creatureType;}
     void move() override;
     void draw() const override;
-protected:
-    AquariumCreatureType m_creatureType;
+    void grantInvincibility(int durationFrames);
+    void reduceInvincibilityTimer();
+    bool isInvincible() const { return m_invincibility_timer > 0; }
 
+protected:
+    int m_score = 0;
+    AquariumCreatureType m_creatureType;
+    int m_invincibility_timer = 0;
 };
 
 class BiggerFish : public NPCreature {
@@ -125,6 +174,9 @@ class AquariumSpriteManager {
         std::shared_ptr<GameSprite> m_big_fish;
         std::shared_ptr<GameSprite> m_jelly_fish;
         std::shared_ptr<GameSprite> m_skeleton_fish;
+        std::shared_ptr<GameSprite> m_speed_powerup_sprite;
+        std::shared_ptr<GameSprite> m_extra_life_powerup_sprite;
+        std::shared_ptr<GameSprite> m_invincibility_powerup_sprite;
 };
 
 
@@ -212,9 +264,23 @@ class Level_2 : public AquariumLevel  {
             this->m_levelPopulation.push_back(std::make_shared<AquariumLevelPopulationNode>(AquariumCreatureType::BiggerFish, 5));
             this->m_levelPopulation.push_back(std::make_shared<AquariumLevelPopulationNode>(AquariumCreatureType::JellyFish, 4));
             this->m_levelPopulation.push_back(std::make_shared<AquariumLevelPopulationNode>(AquariumCreatureType::SkeletonFish, 2));
-
-
+            this->m_levelPopulation.push_back(std::make_shared<AquariumLevelPopulationNode>(AquariumCreatureType::SpeedPowerup, 1));
+            this->m_levelPopulation.push_back(std::make_shared<AquariumLevelPopulationNode>(AquariumCreatureType::ExtraLifePowerup, 3));
+            this->m_levelPopulation.push_back(std::make_shared<AquariumLevelPopulationNode>(AquariumCreatureType::InvincibilityPowerup, 5));
         };
         std::vector<AquariumCreatureType> Repopulate() override;
 
+};
+class Level_3 : public AquariumLevel{
+public:
+Level_3(int levelNumber, int targetScore): AquariumLevel(levelNumber, targetScore){
+this->m_levelPopulation.push_back(std::make_shared<AquariumLevelPopulationNode>(AquariumCreatureType::NPCreature, 40));
+this->m_levelPopulation.push_back(std::make_shared<AquariumLevelPopulationNode>(AquariumCreatureType::BiggerFish, 7));
+this->m_levelPopulation.push_back(std::make_shared<AquariumLevelPopulationNode>(AquariumCreatureType::JellyFish, 5));
+this->m_levelPopulation.push_back(std::make_shared<AquariumLevelPopulationNode>(AquariumCreatureType::SkeletonFish, 3));
+ this->m_levelPopulation.push_back(std::make_shared<AquariumLevelPopulationNode>(AquariumCreatureType::SpeedPowerup, 2));
+ this->m_levelPopulation.push_back(std::make_shared<AquariumLevelPopulationNode>(AquariumCreatureType::ExtraLifePowerup, 3));
+ this->m_levelPopulation.push_back(std::make_shared<AquariumLevelPopulationNode>(AquariumCreatureType::InvincibilityPowerup, 5));
+};
+std::vector<AquariumCreatureType> Repopulate() override;
 };
