@@ -22,10 +22,9 @@ To submit this assignment, create a Release with the branch that holds all the c
 Grading
 
 ## Team Info
-| Student Number | Student Name | Student Email |
-|-|-|-|
-|(STUDENT NUMBER HERE)| (STUDENT NAME HERE)| (STUDENT EMAIL HERE) |
-|(STUDENT NUMBER HERE)| (STUDENT NAME HERE)| (STUDENT EMAIL HERE) |
+802-23-8276 | Diego S. Hernandez Gonzalez | diego.hernandez27@upr.edu
+
+802-23-2629 | Pedro I. Mauras Ramirez | pedro.mauras@upr.edu
 
 ---
 
@@ -37,3 +36,5 @@ If a partner has no commits in the repositories, they will receive a 0.
 
 # Student Notes
 If you have any bonus specs, bonus or any details the TA's should know, you should include it here:
+
+Added 2 extra powerups: invincibility and an extra life bubble.
